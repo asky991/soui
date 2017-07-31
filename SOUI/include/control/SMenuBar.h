@@ -17,6 +17,7 @@ namespace SOUI
 
 		BOOL Init(SHostWnd *pHostWnd);
 		BOOL Insert(LPCTSTR pszTitle, LPCTSTR pszResName, int iPos = -1);
+		BOOL Insert(pugi::xml_node xmlNode, int iPos = -1);
 
 	protected:
 		virtual BOOL CreateChildren(pugi::xml_node xmlNode);

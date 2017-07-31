@@ -14,15 +14,18 @@ namespace SOUI
 		SOUI_CLASS_NAME(SMenuItem, L"menuItem")
 		friend class SMenuBar;
 	public:
-		SMenuItem(SMenuBar *pHostMenu, SStringT strResName);
+		SMenuItem(SMenuBar *pHostMenu);
 		~SMenuItem();
 
 		void SetData(ULONG_PTR data) { m_data = data; }
 		ULONG_PTR GetData() { return m_data; }
 
+		bool IsMenuLoaded() const;
 	protected:
-		BOOL IsLoad() { return m_bIsLoad; }
 		UINT PopMenu();
+		HRESULT OnAttrSrc(const SStringW & strValue, BOOL bLoading);
+
+		bool OnCmd(EventArgs *e);
 
 		virtual CSize GetDesiredSize(LPCRECT pRcContainer);
 		virtual void OnFinalRelease() { delete this; }
@@ -34,30 +37,23 @@ namespace SOUI
 
 		SOUI_MSG_MAP_BEGIN()
 			MSG_WM_MOUSEMOVE(OnMouseMove)
-			MSG_WM_LBUTTONDOWN(OnLButtonDown)
-			MSG_WM_LBUTTONUP(OnLButtonUp)
 			MSG_WM_TIMER(OnTimer)
 		SOUI_MSG_MAP_END()
 
 		SOUI_ATTRS_BEGIN()
-			ATTR_STRINGT(_T("menuName"), m_strResName, TRUE)
+			ATTR_CUSTOM(_T("src"), OnAttrSrc)
 		SOUI_ATTRS_END()
 
 		ULONG_PTR m_data;
 		SMenuBar* m_pHostMenu;
-		SStringT m_strResName;
-		BOOL m_bIsLoad;
 		SMenuEx m_Menu;
 	};
 
-	SMenuItem::SMenuItem(SMenuBar *pHostMenu, SStringT strResName):
-		m_data(0),
-		m_pHostMenu(pHostMenu),
-		m_strResName(strResName),
-		m_bIsLoad(FALSE)
+	SMenuItem::SMenuItem(SMenuBar *pHostMenu):
+		m_pHostMenu(pHostMenu)
 	{
-		SetAttribute(_T("drawFocusRect"), _T("0"));
-		m_bIsLoad = m_Menu.LoadMenu(strResName);
+		m_bDrawFocusRect = FALSE;
+		GetEventSet()->subscribeEvent(EventCmd::EventID,Subscriber(&SMenuItem::OnCmd,this));
 	}
 
 	SMenuItem::~SMenuItem()
@@ -107,20 +103,6 @@ namespace SOUI
 		}
 	}
 
-	void SMenuItem::OnLButtonUp(UINT nFlags, CPoint pt)
-	{
-		SButton::OnLButtonUp(nFlags, pt);
-	}
-
-	void SMenuItem::OnLButtonDown(UINT nFlags, CPoint pt)
-	{
-		SButton::OnLButtonDown(nFlags, pt);
-		BringWindowToTop();
-		if (!::IsWindow(m_pHostMenu->m_hWnd))
-			return;
-		PopMenu();
-	}
-
 	void SMenuItem::OnTimer(UINT_PTR timerID)
 	{
 		if (timerID == TIMER_POP)
@@ -136,6 +118,23 @@ namespace SOUI
 	CSize SMenuItem::GetDesiredSize(LPCRECT pRcContainer)
 	{
 		return SWindow::GetDesiredSize(pRcContainer);
+	}
+
+	HRESULT SMenuItem::OnAttrSrc(const SStringW & strValue, BOOL bLoading)
+	{
+		return m_Menu.LoadMenu(strValue)?S_OK:E_INVALIDARG;		
+	}
+
+	bool SMenuItem::IsMenuLoaded() const
+	{
+		return !m_Menu.IsEmpty();
+	}
+
+	bool SMenuItem::OnCmd(EventArgs *e)
+	{
+		PopMenu();
+		e->bubbleUp = false;
+		return true;
 	}
 
 	SMenuBar::SMenuBar() :
@@ -164,14 +163,8 @@ namespace SOUI
 		if (!pszResName)
 			return FALSE;
 
-		SMenuItem *pNewMenu = new SMenuItem(this, pszResName);
+		SMenuItem *pNewMenu = new SMenuItem(this);
 		SASSERT(pNewMenu);
-		if (!pNewMenu->IsLoad())
-		{
-			pNewMenu->DestroyWindow();
-			delete pNewMenu;
-			return FALSE;
-		}
 		InsertChild(pNewMenu);
 
 		pugi::xml_node xmlBtnStyle = m_xmlStyle.child(XmlBtnStyle);
@@ -181,9 +174,38 @@ namespace SOUI
 		if(pszTitle)
 			pNewMenu->SetWindowText(pszTitle);
 
+		pNewMenu->SetAttribute(L"src",S_CT2W(pszResName));
+		pNewMenu->SetWindowText(pszTitle);
+
+		if(!pNewMenu->IsMenuLoaded())
+		{
+			DestroyChild(pNewMenu);
+			return FALSE;
+		}
 		if (iPos < 0) iPos = m_lstMenuItem.GetCount();
 		m_lstMenuItem.InsertAt(iPos, pNewMenu);
 
+		return TRUE;
+	}
+
+	BOOL SMenuBar::Insert(pugi::xml_node xmlNode, int iPos /*= -1*/)
+	{
+		SMenuItem *pNewMenu = new SMenuItem(this);
+		SASSERT(pNewMenu);
+		InsertChild(pNewMenu);
+
+		pugi::xml_node xmlBtnStyle = m_xmlStyle.child(XmlBtnStyle);
+		if (xmlBtnStyle)
+			pNewMenu->InitFromXml(xmlBtnStyle);
+		pNewMenu->InitFromXml(xmlNode);
+
+		if(!pNewMenu->IsMenuLoaded())
+		{
+			DestroyChild(pNewMenu);
+			return FALSE;
+		}
+		if (iPos < 0) iPos = m_lstMenuItem.GetCount();
+		m_lstMenuItem.InsertAt(iPos, pNewMenu);		
 		return TRUE;
 	}
 
@@ -201,8 +223,7 @@ namespace SOUI
 			{
 				if (_tcsicmp(xmlChild.name(), SMenuItem::GetClassName()) != 0)
 					continue;
-				Insert(xmlChild.first_child().value(),
-					xmlChild.attribute(_T("menuName")).value());
+				Insert(xmlChild);
 			}
 		}
 
