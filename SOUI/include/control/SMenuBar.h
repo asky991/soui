@@ -20,7 +20,6 @@ namespace SOUI
 
 	protected:
 		virtual BOOL CreateChildren(pugi::xml_node xmlNode);
-		virtual void UpdateChildrenPosition();
 
 		SArray<SMenuItem*> m_lstMenuItem;
 		HWND m_hWnd;

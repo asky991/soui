@@ -24,6 +24,7 @@ namespace SOUI
 		BOOL IsLoad() { return m_bIsLoad; }
 		UINT PopMenu();
 
+		virtual CSize GetDesiredSize(LPCRECT pRcContainer);
 		virtual void OnFinalRelease() { delete this; }
 		void OnMouseMove(UINT nFlags, CPoint pt);
 		void OnLButtonUp(UINT nFlags, CPoint pt);
@@ -132,6 +133,11 @@ namespace SOUI
 		}
 	}
 
+	CSize SMenuItem::GetDesiredSize(LPCRECT pRcContainer)
+	{
+		return SWindow::GetDesiredSize(pRcContainer);
+	}
+
 	SMenuBar::SMenuBar() :
 		m_bIsShow(FALSE),
 		m_hWnd(NULL),
@@ -152,6 +158,7 @@ namespace SOUI
 		}
 		return FALSE;
 	}
+
 	BOOL SMenuBar::Insert(LPCTSTR pszTitle, LPCTSTR pszResName, int iPos)
 	{
 		if (!pszResName)
@@ -177,9 +184,9 @@ namespace SOUI
 		if (iPos < 0) iPos = m_lstMenuItem.GetCount();
 		m_lstMenuItem.InsertAt(iPos, pNewMenu);
 
-		UpdateChildrenPosition();
 		return TRUE;
 	}
+
 	BOOL SMenuBar::CreateChildren(pugi::xml_node xmlNode)
 	{
 		pugi::xml_node xmlBtnStyle = xmlNode.child(XmlBtnStyle);
@@ -192,7 +199,7 @@ namespace SOUI
 		{
 			for (pugi::xml_node xmlChild = xmlTMenus.first_child(); xmlChild; xmlChild = xmlChild.next_sibling())
 			{
-				if (_tcscmp(xmlChild.name(), SMenuItem::GetClassName()) != 0)
+				if (_tcsicmp(xmlChild.name(), SMenuItem::GetClassName()) != 0)
 					continue;
 				Insert(xmlChild.first_child().value(),
 					xmlChild.attribute(_T("menuName")).value());
@@ -201,26 +208,5 @@ namespace SOUI
 
 		return TRUE;
 	}
-	void SMenuBar::UpdateChildrenPosition()
-	{
-		CRect rcClient;
-		GetClientRect(&rcClient);
-		for (size_t i = 0; i < m_lstMenuItem.GetCount(); i++)
-		{
-			CRect rcLeft;
-			if (i > 0)
-				m_lstMenuItem[i - 1]->GetWindowRect(&rcLeft);
-			else
-			{
-				rcLeft = rcClient;
-				rcLeft.right = rcLeft.left;
-			}
-			CRect rcInit;
-			rcInit.top = rcLeft.top;
-			rcInit.left = rcLeft.right + 1;
-			rcInit.right = rcLeft.right + 50;
-			rcInit.bottom = rcInit.top + 20;
-			m_lstMenuItem[i]->Move(rcInit);
-		}
-	}
+
 }
