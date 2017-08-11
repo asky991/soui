@@ -18,7 +18,7 @@ else{
 DEPENDPATH += . exports
 INCLUDEPATH += . \
 			   ./src \
-			   ../../third-part/lua-52/src \
+			   ../../third-part/liblua/include \
 			   ../../soui/include \
 			   ../../utilities/include \
 
@@ -28,10 +28,10 @@ include($$dir/common.pri)
 
 
 CONFIG(debug,debug|release){
-	LIBS += lua-52d.lib souid.lib utilitiesd.lib
+	LIBS += libluad.lib souid.lib utilitiesd.lib
 }
 else{
-	LIBS += lua-52.lib soui.lib utilities.lib
+	LIBS += libua.lib soui.lib utilities.lib
 }
 
 PRECOMPILED_HEADER = src/stdafx.h
